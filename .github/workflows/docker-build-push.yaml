@@ -22,7 +22,7 @@ jobs:
         include:
           - image_identifier: gdal-ubuntu
             image_name: jw141/gdal-base
-            dockerfile: Dockerfile.ubunt
+            dockerfile: Dockerfile.ubuntu
             prod_tag: ubuntu-latest
           - image_identifier: gdal-rockylinux
             image_name: jw141/gdal-base
