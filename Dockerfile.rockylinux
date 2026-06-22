@@ -1,0 +1,12 @@
+FROM rockylinux/rockylinux:9.7
+
+# Upgrade base OS, enable required repos, install GDAL + Python bindings,
+# and clear caches to reduce vulnerability surface and footprint.
+RUN dnf clean all && \
+    dnf -y --refresh upgrade && \
+    dnf -y install epel-release && \
+    dnf config-manager --set-enabled crb && \
+    dnf -y install gdal gdal-libs python3-gdal && \
+    dnf clean all
+
+CMD ["python3", "-c", "from osgeo import gdal; print('GDAL Python bindings operational!')"]

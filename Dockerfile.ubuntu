@@ -1,0 +1,16 @@
+FROM ubuntu:26.04
+
+# Prevent interactive prompts from freezing the build pipeline
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update package indexes, upgrade all existing packages to fix vulnerabilities,
+# install GDAL + native Python bindings, and wipe cache tracking files.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        gdal-bin \
+        python3-gdal && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+CMD ["python3", "-c", "from osgeo import gdal; print('GDAL Python bindings operational!')"]
