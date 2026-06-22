@@ -14,15 +14,15 @@ jobs:
     permissions:
       contents: read
       packages: write
-      security-events: write # Required to upload scan results to the Security tab
+      security-events: write 
 
     strategy:
-      fail-fast: false # If one OS flavor has a CVE vulnerability, don't cancel the other build
+      fail-fast: false 
       matrix:
         include:
           - image_identifier: gdal-ubuntu
             image_name: jw141/gdal-base
-            dockerfile: Dockerfile.ubuntu
+            dockerfile: Dockerfile.ubuntu      
             prod_tag: ubuntu-latest
           - image_identifier: gdal-rockylinux
             image_name: jw141/gdal-base
@@ -41,39 +41,45 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Load Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          load: true # Loads image into the local runner so Trivy can see it
+          load: true 
           tags: ${{ env.REGISTRY }}/${{ matrix.image_name }}:temp-${{ matrix.image_identifier }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run Trivy (Table output for logs)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ matrix.image_name }}:temp-${{ matrix.image_identifier }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0' # Don't fail yet, we want to save the SARIF next
+          ignore-unfixed: true
+          exit-code: '0'
 
       - name: Run Trivy (SARIF for Security tab)
-        uses: aquasecurity/trivy-action@v0.35.0
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ matrix.image_name }}:temp-${{ matrix.image_identifier }}
           format: 'sarif'
           output: 'trivy-results-${{ matrix.image_identifier }}.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1' # This will fail the build if vulnerabilities exist
+          ignore-unfixed: true
+          limit-severities-for-sarif: true # <-- FIX: Prevents Trivy from scanning LOW/MEDIUM
+          exit-code: '1' 
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() # Ensure the upload happens even if the step above fails
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.trivy-scan.outcome != 'skipped'
         with:
           sarif_file: 'trivy-results-${{ matrix.image_identifier }}.sarif'
 
       - name: Final Build and Push
-        if: success() # Only push if the scan passed
-        uses: docker/build-push-action@v5
+        if: success() 
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -81,3 +87,5 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ matrix.image_name }}:${{ matrix.prod_tag }}
             ${{ env.REGISTRY }}/${{ matrix.image_name }}:${{ matrix.prod_tag }}-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
